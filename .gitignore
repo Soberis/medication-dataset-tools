@@ -4,3 +4,4 @@ metadata/
 __pycache__/
 .venv/
 urls.csv
+data/
