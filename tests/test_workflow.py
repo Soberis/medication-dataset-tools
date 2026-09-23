@@ -66,6 +66,7 @@ class WorkflowTests(unittest.TestCase):
             blocked = subprocess.CompletedProcess([], 0, json.dumps({"entries": [None]}), "ERROR: HTTP Error 412: Precondition Failed")
             recovered = subprocess.CompletedProcess([], 0, json.dumps({"entries": [{"id": BV1, "title": "护士第一视角配药"}]}), "")
             with patch("src.search.subprocess.run", side_effect=[blocked, recovered]) as run, \
+                 patch("src.search.fetch_bilibili_search", return_value=[]), \
                  patch("src.search.time.sleep") as sleep, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 self.assertEqual(search(keywords, csv_path, 50), (1, 0))
             self.assertEqual(run.call_count, 2)
@@ -79,9 +80,25 @@ class WorkflowTests(unittest.TestCase):
             keywords.write_text("第一视角 配药\n护士 配药\n安瓿 抽药\n", encoding="utf-8")
             blocked = subprocess.CompletedProcess([], 0, json.dumps({"entries": [None]}), "ERROR: HTTP Error 412")
             with patch("src.search.subprocess.run", return_value=blocked) as run, \
+                 patch("src.search.fetch_bilibili_search", return_value=[]), \
                  patch("src.search.time.sleep"), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 self.assertEqual(search(keywords, root / "candidates.csv", 1), (0, 2))
             self.assertEqual(run.call_count, 6)
+
+    def test_search_fallback_to_native_api_on_412(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keywords = root / "keywords.txt"
+            keywords.write_text("护士 配药\n", encoding="utf-8")
+            csv_path = root / "candidates.csv"
+            blocked = subprocess.CompletedProcess([], 0, json.dumps({"entries": [None]}), "ERROR: HTTP Error 412")
+            native_data = [{"bvid": BV2, "title": "第一视角手部配药", "author": "护士", "duration": "90", "pic": ""}]
+            with patch("src.search.subprocess.run", return_value=blocked), \
+                 patch("src.search.fetch_bilibili_search", return_value=native_data), \
+                 patch("src.search.time.sleep"), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                added, failures = search(keywords, csv_path, 50)
+                self.assertEqual((added, failures), (1, 0))
+            self.assertEqual(read_candidates(csv_path)[0]["bvid"], BV2)
 
     def test_main_cli_download_default_output_dir(self):
         import main

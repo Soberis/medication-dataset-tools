@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+import urllib.parse
+import urllib.request
 from .manifest import append_candidates
 
 
@@ -14,6 +16,21 @@ BVID = re.compile(r"BV[0-9A-Za-z]{10}")
 EXCLUDED = ("ppt", "理论", "试题", "考试", "题库", "动画", "游戏", "中药", "兽医", "宠物")
 ACTION_TERMS = ("配药", "抽药", "抽吸", "配液", "静配", "安瓿", "西林瓶", "药液", "药瓶")
 VIEW_TERMS = ("第一视角", "pov", "沉浸式", "身临其境", "手部", "手持", "头戴")
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+
+def fetch_bilibili_search(keyword: str) -> list[dict]:
+    headers = {"User-Agent": USER_AGENT, "Referer": "https://www.bilibili.com"}
+    url = f"https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword={urllib.parse.quote(keyword)}"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("code") == 0:
+            return data.get("data", {}).get("result", [])
+    except Exception:
+        pass
+    return []
 
 
 def load_keywords(path: Path) -> list[str]:
@@ -73,6 +90,30 @@ def search(keywords_path: Path, candidates_path: Path, limit: int, cookies_from_
             if not search_error and any(entry is None for entry in entries):
                 search_error = "部分视频元数据获取失败"
             search_error = search_error or parse_error
+
+            # 若遇到 412 错误且未找到条目，尝试官方搜索直连兜底
+            if "412" in search_error and not found:
+                native_results = fetch_bilibili_search(keyword)
+                if native_results:
+                    for item in native_results:
+                        bvid = item.get("bvid") or ""
+                        title = re.sub(r"<[^>]+>", "", item.get("title", "")).strip()
+                        pic = item.get("pic", "")
+                        if pic.startswith("//"):
+                            pic = "https:" + pic
+                        c = candidate({
+                            "id": bvid,
+                            "title": title,
+                            "uploader": item.get("author", ""),
+                            "duration": item.get("duration", ""),
+                            "thumbnail": pic
+                        }, keyword)
+                        if c:
+                            found.append(c)
+                    if found:
+                        search_error = ""
+                        break
+
             if "412" not in search_error or attempt == 2:
                 break
             delay = 3 * (attempt + 1)
