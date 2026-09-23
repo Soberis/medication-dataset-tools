@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .manifest import append_candidates
@@ -40,32 +41,52 @@ def candidate(entry: dict, keyword: str) -> dict[str, str] | None:
     }
 
 
-def search(keywords_path: Path, candidates_path: Path, limit: int) -> tuple[int, int]:
+def search(keywords_path: Path, candidates_path: Path, limit: int, cookies_from_browser: str | None = None,
+           cookies_file: Path | None = None) -> tuple[int, int]:
     keywords = load_keywords(keywords_path)
     if not keywords:
         raise ValueError("关键词文件为空")
-    found = []
+    added = 0
     failures = 0
+    consecutive_412 = 0
     for keyword in keywords:
         print(f"搜索：{keyword}", flush=True)
         command = [sys.executable, "-m", "yt_dlp", "--ignore-config", "--no-flat-playlist",
-                   "--skip-download", "--dump-single-json", f"bilisearch{limit}:{keyword}"]
-        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
-        if result.returncode:
+                   "--skip-download", "--dump-single-json", "--sleep-requests", "0.5",
+                   "--retry-sleep", "extractor:linear=3:9", f"bilisearch{limit}:{keyword}"]
+        if cookies_from_browser:
+            command[3:3] = ["--cookies-from-browser", cookies_from_browser]
+        elif cookies_file:
+            command[3:3] = ["--cookies", str(cookies_file)]
+        found = []
+        search_error = ""
+        for attempt in range(3):
+            result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+            parse_error = ""
+            try:
+                entries = json.loads(result.stdout).get("entries") or []
+            except (ValueError, AttributeError) as error:
+                entries = []
+                parse_error = f"搜索结果解析失败：{error}"
+            found.extend(row for entry in entries if isinstance(entry, dict) if (row := candidate(entry, keyword)))
+            search_error = (result.stderr.strip() or f"yt-dlp 退出码 {result.returncode}") if result.returncode or "ERROR:" in result.stderr else ""
+            if not search_error and any(entry is None for entry in entries):
+                search_error = "部分视频元数据获取失败"
+            search_error = search_error or parse_error
+            if "412" not in search_error or attempt == 2:
+                break
+            delay = 3 * (attempt + 1)
+            print(f"B 站返回 412；{delay} 秒后重试：{keyword}（{attempt + 1}/2）", file=sys.stderr, flush=True)
+            time.sleep(delay)
+        added += append_candidates(candidates_path, found)
+        if search_error:
             failures += 1
-            print(f"搜索失败：{keyword}：{result.stderr.strip() or result.returncode}", file=sys.stderr)
-            continue
-        try:
-            entries = json.loads(result.stdout).get("entries") or []
-        except (ValueError, AttributeError) as error:
-            failures += 1
-            print(f"搜索结果解析失败：{keyword}：{error}", file=sys.stderr)
-            continue
-        usable = [row for entry in entries if isinstance(entry, dict) if (row := candidate(entry, keyword))]
-        found.extend(usable)
-        if "ERROR:" in result.stderr or any(entry is None for entry in entries):
-            failures += 1
-            print(f"部分候选元数据获取失败：{keyword}：保留 {len(usable)} 条", file=sys.stderr)
-    added = append_candidates(candidates_path, found)
+            print(f"搜索未完全成功：{keyword}；已保留可用候选；{search_error}", file=sys.stderr)
+            consecutive_412 = consecutive_412 + 1 if "412" in search_error else 0
+            if consecutive_412 >= 2:
+                print("连续两个关键词被 B 站返回 412；已停止本轮搜索，请检查登录状态或稍后重试。", file=sys.stderr)
+                break
+        else:
+            consecutive_412 = 0
     print(f"搜索结束：新增 {added} 条候选，失败关键词 {failures} 个；候选文件：{candidates_path}")
     return added, failures

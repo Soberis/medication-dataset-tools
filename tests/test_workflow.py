@@ -57,6 +57,32 @@ class WorkflowTests(unittest.TestCase):
         self.assertIsNone(candidate({"id": BV1, "title": "PPT 配药"}, "配药"))
         self.assertIsNone(candidate({"id": BV1, "title": "护士工作第一视角"}, "配药"))
 
+    def test_search_retries_412_and_keeps_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keywords = root / "keywords.txt"
+            keywords.write_text("护士 配药\n", encoding="utf-8")
+            csv_path = root / "candidates.csv"
+            blocked = subprocess.CompletedProcess([], 0, json.dumps({"entries": [None]}), "ERROR: HTTP Error 412: Precondition Failed")
+            recovered = subprocess.CompletedProcess([], 0, json.dumps({"entries": [{"id": BV1, "title": "护士第一视角配药"}]}), "")
+            with patch("src.search.subprocess.run", side_effect=[blocked, recovered]) as run, \
+                 patch("src.search.time.sleep") as sleep, redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(search(keywords, csv_path, 50), (1, 0))
+            self.assertEqual(run.call_count, 2)
+            sleep.assert_called_once_with(3)
+            self.assertEqual(read_candidates(csv_path)[0]["bvid"], BV1)
+
+    def test_search_stops_after_two_persistent_412_keywords(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keywords = root / "keywords.txt"
+            keywords.write_text("第一视角 配药\n护士 配药\n安瓿 抽药\n", encoding="utf-8")
+            blocked = subprocess.CompletedProcess([], 0, json.dumps({"entries": [None]}), "ERROR: HTTP Error 412")
+            with patch("src.search.subprocess.run", return_value=blocked) as run, \
+                 patch("src.search.time.sleep"), redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(search(keywords, root / "candidates.csv", 1), (0, 2))
+            self.assertEqual(run.call_count, 6)
+
     def test_main_cli_download_default_output_dir(self):
         import main
         with tempfile.TemporaryDirectory() as directory:
@@ -69,7 +95,31 @@ class WorkflowTests(unittest.TestCase):
                  patch("main.download", return_value=(0, 0)) as mock_download:
                 exit_code = main.main()
                 self.assertEqual(exit_code, 0)
-                mock_download.assert_called_once_with(candidates, main.DEFAULT_DOWNLOAD_DIR)
+                mock_download.assert_called_once_with(candidates, main.DEFAULT_DOWNLOAD_DIR, None, None)
+
+    def test_browser_cookies_are_opt_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keywords = root / "keywords.txt"
+            keywords.write_text("护士 配药\n", encoding="utf-8")
+            response = subprocess.CompletedProcess([], 0, json.dumps({"entries": []}), "")
+            with patch("src.search.subprocess.run", return_value=response) as run, redirect_stdout(io.StringIO()):
+                search(keywords, root / "candidates.csv", 1, "edge")
+            self.assertIn("--cookies-from-browser", run.call_args.args[0])
+            self.assertIn("edge", run.call_args.args[0])
+
+    def test_cookie_file_is_passed_to_ytdlp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keywords = root / "keywords.txt"
+            keywords.write_text("护士 配药\n", encoding="utf-8")
+            cookies = root / "cookies.txt"
+            cookies.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+            response = subprocess.CompletedProcess([], 0, json.dumps({"entries": []}), "")
+            with patch("src.search.subprocess.run", return_value=response) as run, redirect_stdout(io.StringIO()):
+                search(keywords, root / "candidates.csv", 1, cookies_file=cookies)
+            self.assertIn("--cookies", run.call_args.args[0])
+            self.assertIn(str(cookies), run.call_args.args[0])
 
 
 if __name__ == "__main__":
