@@ -1,0 +1,6 @@
+raw/
+metadata/
+*.pyc
+__pycache__/
+.venv/
+urls.csv
