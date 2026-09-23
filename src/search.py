@@ -11,6 +11,8 @@ from .manifest import append_candidates
 
 BVID = re.compile(r"BV[0-9A-Za-z]{10}")
 EXCLUDED = ("ppt", "理论", "试题", "考试", "题库", "动画", "游戏", "中药", "兽医", "宠物")
+ACTION_TERMS = ("配药", "抽药", "抽吸", "配液", "静配", "安瓿", "西林瓶", "药液", "药瓶")
+VIEW_TERMS = ("第一视角", "pov", "沉浸式", "身临其境", "手部", "手持", "头戴")
 
 
 def load_keywords(path: Path) -> list[str]:
@@ -20,7 +22,8 @@ def load_keywords(path: Path) -> list[str]:
 
 def candidate(entry: dict, keyword: str) -> dict[str, str] | None:
     title = str(entry.get("title") or "").strip()
-    if not title or any(term in title.casefold() for term in EXCLUDED):
+    folded = title.casefold()
+    if not title or any(term in folded for term in EXCLUDED) or not any(term in folded for term in ACTION_TERMS):
         return None
     raw = " ".join(str(entry.get(key) or "") for key in ("id", "url", "webpage_url"))
     match = BVID.search(raw)
@@ -32,6 +35,8 @@ def candidate(entry: dict, keyword: str) -> dict[str, str] | None:
         "url": f"https://www.bilibili.com/video/{bvid}",
         "keyword": keyword, "uploader": str(entry.get("uploader") or ""),
         "duration": str(entry.get("duration") or ""),
+        "title_hint": "优先预览" if any(term in folded for term in VIEW_TERMS) else "普通预览",
+        "thumbnail": str(entry.get("thumbnail") or ""),
     }
 
 

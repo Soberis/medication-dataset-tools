@@ -17,14 +17,16 @@ ffmpeg -version
 python main.py search
 ```
 
-搜索读取 `config/keywords.txt`，每个关键词默认取 50 条。yt-dlp 会读取候选元数据以取得标题和 BV 号，但不会下载视频。结果按 BV 号去重并追加到 `data/candidates.csv`；再次搜索会保留已有行的 `selected`。可用 `--limit 30` 调整每个关键词的结果数。
+搜索读取 `config/keywords.txt`，每个关键词默认取 50 条。yt-dlp 会读取候选元数据以取得标题和 BV 号，但不会下载视频。结果按 BV 号去重并追加到 `data/candidates.csv`；再次搜索会保留已有行的 `selected`。可用 `--limit 30` 调整每个关键词的结果数。新候选中，标题含“第一视角、POV、沉浸式、手部”等线索的行排在前面；CSV 也保存可用的封面链接。`title_hint` 只是预览顺序，不代表已看到手。
 
-打开 CSV 中的 `url`，快速预览并将合格行的 `selected` 从 `0` 改为 `1`。确认画面接近操作者视角、手持续可见、确实在操作药品，且抽液、开瓶或配液等动作清楚。PPT、讲课、远景及只有几秒配药动作的视频不选。编辑 CSV 时请保留表头和 `bvid`、`url` 列。
+打开 CSV 中的 `url`，快速预览并将合格行的 `selected` 从 `0` 改为 `1`。先看封面，再在视频开头、中段和末段各抽看几秒：确认画面接近操作者视角、手部在主要配药段持续可见、手确实操作药品，且抽液、开瓶或配液等动作清楚。即使视频有 10 分钟，只要没有清楚的手部配药动作就不选。PPT、讲课、远景及只有几秒配药动作的视频也不选。编辑 CSV 时请保留表头和 `bvid`、`url` 列。
 
 ```powershell
 python main.py download
 ```
 
-下载只处理 `selected=1` 的行。每个 BV 的文件放在 `data/videos/BV.../`，包含 MP4、`info.json` 和平台提供时的缩略图。`data/downloaded.txt` 是 yt-dlp 的下载档案；再次运行会跳过已完成的视频，失败行可重试，未完成的分片可续传。成功和失败写入 `data/download.log`。如果某个视频不可访问或未提供缩略图，日志会记录实际结果。
+下载只处理 `selected=1` 的行。默认保存到系统“下载”目录（如 Windows 的 `Downloads/BV.../`，可通过 `--output-dir` 自定义），每个 BV 独立文件夹，包含 MP4、`info.json` 和封面缩略图。目标目录下的 `downloaded.txt` 是 yt-dlp 的下载档案，再次运行会跳过已完成的视频，失败行可重试，未完成的分片可续传。成功和失败写入目标目录下的 `download.log`。如果某个视频不可访问或未提供缩略图，日志会记录实际结果。
 
 `search` 即使某个关键词失败，也会继续其余关键词并保存已找到的候选；退出码非零表示本次有搜索失败。搜索阶段不下载视频。CSV 用 UTF-8 BOM 写入，便于 Excel 打开。
+
+运行 `python -m unittest discover tests` 时出现的 BV 号和“失败”文字来自模拟数据，用来验证单条失败后继续；测试不访问 B 站或下载视频。

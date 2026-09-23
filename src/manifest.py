@@ -6,7 +6,8 @@ import tempfile
 from pathlib import Path
 
 
-FIELDS = ("selected", "bvid", "title", "url", "keyword", "uploader", "duration")
+FIELDS = ("selected", "bvid", "title", "url", "keyword", "uploader", "duration", "title_hint", "thumbnail")
+REQUIRED_FIELDS = FIELDS[:7]
 
 
 def read_candidates(path: Path) -> list[dict[str, str]]:
@@ -14,9 +15,12 @@ def read_candidates(path: Path) -> list[dict[str, str]]:
         return []
     with path.open("r", encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
-        if not set(FIELDS).issubset(reader.fieldnames or []):
-            raise ValueError(f"{path} 缺少必要列：{', '.join(FIELDS)}")
+        if not set(REQUIRED_FIELDS).issubset(reader.fieldnames or []):
+            raise ValueError(f"{path} 缺少必要列：{', '.join(REQUIRED_FIELDS)}")
         rows = list(reader)
+    for row in rows:
+        for field in FIELDS:
+            row.setdefault(field, "")
     seen = set()
     for number, row in enumerate(rows, 2):
         bvid = row["bvid"].strip()
@@ -30,7 +34,7 @@ def append_candidates(path: Path, new_rows: list[dict[str, str]]) -> int:
     rows = read_candidates(path)
     known = {row["bvid"].strip() for row in rows}
     added = 0
-    for row in new_rows:
+    for row in sorted(new_rows, key=lambda item: item.get("title_hint") != "优先预览"):
         if row["bvid"] not in known:
             rows.append(row)
             known.add(row["bvid"])
