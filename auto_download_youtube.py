@@ -5,7 +5,7 @@ Fully automated:
 2. Filters for 9:16 Shorts / POV videos focusing on hands (安瓿瓶/西林瓶/抽吸/一镜到底).
 3. Automatically discards noise (ASMR, roleplay, lectures, games, sleep-aids).
 4. Downloads video, cover, extracts representative hand frame, and saves metadata into:
-   ~/Downloads/第一人称配药实操视频/youtube_<id> - <title> - <uploader>/
+   D:/下载/第一人称配药实操视频/youtube_<id> - <title> - <uploader>/
 """
 
 import argparse
@@ -147,23 +147,21 @@ def is_qualified_candidate(title: str, duration: Optional[float] = None) -> bool
         return False
 
     # 3. Reject pure ampoule flicking sound memes without real dispensing
-    if any(k in title_lower for k in ["彈安瓿", "弹安瓿", "掰安瓿"]) and not any(k in title_lower for k in ["配药", "配藥", "連配", "连配", "一镜到底", "一鏡到底"]):
+    if any(k in title_lower for k in ["彈安瓿", "弹安瓿", "掰安瓿"]) and not any(k in title_lower for k in ["配药", "配藥", "連配", "连配", "加药", "加藥"]):
         return False
 
-    # 4. Reject pure single-action injection/needle shots without dispensing
-    if any(k in title_lower for k in ["肌肉注射", "留置針", "留置针", "留著針", "留着针", "皮下注射"]) and not any(k in title_lower for k in ["配药", "配藥", "連配", "连配", "輸液", "输液"]):
+    # 4. Reject blood drawing / blood culture sampling (抽血/血培养)
+    if any(k in title_lower for k in ["抽血", "血培养", "血培養", "采血", "採血"]):
         return False
 
-    # 5. Core dispensing operation check
-    matched_terms = [t for t in WHITELIST_TERMS if t in title_lower]
-    if len(matched_terms) >= 1:
-        core_hits = any(t in title_lower for t in [
-            "配药", "配藥", "抽吸", "一镜到底", "一鏡到底", "第一视角", "第一視角",
-            "加药", "加藥", "输液", "輸液", "抽药", "抽藥", "连配", "連配", "流水線", "流水线"
-        ])
-        return core_hits
+    # 5. Reject pure puncture/injection/indwelling needle without real dispensing
+    dispensing_core = ["配药", "配藥", "連配", "连配", "加药", "加藥", "化药", "化藥", "流水線", "流水线"]
+    puncture_only = ["留置針", "留置针", "留著針", "留着针", "皮试", "皮試", "肌肉注射", "皮下注射", "小孩扎针", "小孩扎針", "小孩三连扎", "小孩三連扎"]
+    if any(k in title_lower for k in puncture_only) and not any(k in title_lower for k in dispensing_core):
+        return False
 
-    return False
+    # 6. Must contain core medication preparation keywords
+    return any(t in title_lower for t in dispensing_core)
 
 
 def search_youtube_candidates(keyword: str, max_results: int = 15) -> List[Dict[str, Any]]:

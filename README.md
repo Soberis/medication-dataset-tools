@@ -1,36 +1,124 @@
-# B 站配药视频下载工具 v0.1
+# 第一人称临床配药视频数据集采集与清洗工具集 (medication-dataset-tools)
 
-搜索配药操作视频候选，人工确认第一视角和手部操作，再批量下载选中的视频。标题和关键词只能帮助缩小范围，不能证明视频符合要求。仅下载和使用有相应权限的视频，尊重原作者和平台规则。
+一套面向医疗具身智能、手术/配药动作识别与临床教学的大规模第一人称（POV）配药视频自动化检索、采集、抽样帧分析、跨平台排重与来源档案管理工具库。
 
-## 安装
+---
 
-直接使用本机的 `python`，无需为本项目创建虚拟环境。需要 Python 3.11+、`ffmpeg`（视频音频合并及 MP4 转封装）和 `requirements.txt` 固定的 yt-dlp 版本。本机已安装这些依赖；换机器时再安装：
+## 🌟 核心特性
+
+1. **全平台覆盖**：支持 **抖音 (Douyin)**、**小红书 (XHS)**、**B站 (Bilibili)**、**YouTube (Shorts/Videos)** 多源视频抓取与元数据解析。
+2. **第一人称视线与手部特写优先**：内置临床专业关键词词库与精准负向过滤规则，自动剔除科普讲座、非实操播报、游戏 ASMR 及剧情演绎，聚焦双手操作、安瓿瓶徒手折断、西林瓶加药溶解、注射器抽吸排气、静脉穿刺等实操环节。
+3. **标准化样本封装规范**：
+   - 目录规范：`<platform>_<id> - <视频标题> - <博主姓名>`
+   - 完备元数据：包含原画视频（`.mp4`）、原图封面（`cover.jpg`）、结构化信息（`*.info.json`）。
+   - 手部动作抽样帧：自动提取操作核心抽帧（`frame_sample.jpg`），方便在文件资源管理器中进行纯视觉快速人工质检。
+4. **科学跨平台感知哈希（pHash）去重**：利用 OpenCV + DCT 算法对比视频关键帧，结合标题编辑距离与时长差异，自动识别跨平台搬运、同源重发，支持画质择优合并。
+5. **大道至简的单一来源档案**：全量样本统一汇总归档于 `data/临床配药样本来源档案.csv`，严格杜绝冗余表格与混乱文件名。
+6. **存储路径隔离**：默认存储于 `D:\下载\第一人称配药实操视频\`，自动兼容原 C 盘历史目录的多目录联合检索与查重。
+
+---
+
+## 📁 科学工程目录划分
+
+```text
+medication-dataset-tools/
+├── main.py                     # 全功能 CLI 统一命令行入口 (search/download/social/auto-search)
+├── download_nurse_pov.py       # 剪贴板实时监听与跨平台快捷下载入口
+├── auto_download_youtube.py    # YouTube 配药与护理第一视角全自动搜索下载器
+├── pytest.ini                  # 单元测试自动发现配置
+├── requirements.txt            # 项目依赖清单
+├── README.md                   # 工程设计与使用文档
+│
+├── config/                     # 检索与过滤词库配置
+│   └── keywords.txt            # 关键词与负向排除词库
+│
+├── data/                       # 数据集档案与凭据存储
+│   └── 临床配药样本来源档案.csv # 唯一的创作者与样本统计档案单表
+│
+├── src/                        # 核心模块
+│   ├── downloader.py           # B站批量下载器
+│   ├── manifest.py             # 候选列表读写与安全事务
+│   ├── search.py               # B站 API 搜索与关键词候选清洗
+│   ├── social_downloader.py    # 抖音 / 小红书 / YouTube / B站 统一解析下载引擎
+│   └── social_search.py        # 浏览器会话与自动化搜索模块
+│
+├── tests/                      # 单元测试套件
+│   └── test_workflow.py        # 核心工作流自动化测试 (pytest 100% 通过)
+│
+└── tools/                      # 运维与深度采集工具箱
+    ├── generate_creator_table.py # 扫描多目录生成唯一的《临床配药样本来源档案.csv》
+    ├── dedup_cross_platform.py # 跨平台去重与视频感知哈希比对工具
+    ├── harvest_xhs_creators.py # 小红书指定临床护士主页自动化批量采集
+    ├── download_single_xhs.py  # 小红书单条视频解析与原画下载
+    └── download_xhs_batch.py   # 小红书短链批量解析与抓取
+```
+
+---
+
+## 🚀 快速上手
+
+### 1. 环境依赖
+
+- Python 3.11+
+- [FFmpeg](https://ffmpeg.org/)（需已加入系统 PATH 环境变量）
+- 安装 Python 依赖：
 
 ```powershell
 python -m pip install -r requirements.txt
-ffmpeg -version
+playwright install chromium
 ```
 
-## 使用
+### 2. 常用操作指令
+
+#### A. 剪贴板监听随剪随下（最推荐）
+在日常浏览各平台配药视频时，复制分享链接即可全自动下载入库：
+```powershell
+python download_nurse_pov.py --watch
+# 或通过 main.py：
+python main.py social --watch
+```
+
+#### B. 直接下载单条或多条链接
+```powershell
+# 支持直接粘贴包含文本的完整分享文案
+python main.py social "https://v.douyin.com/xxxxxx/"
+python main.py social "https://xhslink.cn/xxxxxx"
+python main.py social "https://www.youtube.com/shorts/xxxxxx"
+
+# 从文本文件批量下载
+python main.py social --file urls.txt
+```
+
+#### C. YouTube 全自动关键词挖掘与批量入库
+```powershell
+python auto_download_youtube.py --limit 30 --total 50
+```
+
+#### D. 小红书博主主页深度抓取
+```powershell
+python tools/harvest_xhs_creators.py
+```
+
+#### E. 跨平台视觉去重与质量分析
+```powershell
+# 1. 扫描去重报告
+python tools/dedup_cross_platform.py --scan
+
+# 2. 画质择优演练
+python tools/dedup_cross_platform.py --merge-dry-run
+
+# 3. 自动合并冗余项并移入回收站
+python tools/dedup_cross_platform.py --auto-merge
+```
+
+#### F. 刷新样本来源档案
+```powershell
+python tools/generate_creator_table.py
+```
+> 输出结果将保存至：`data/临床配药样本来源档案.csv`。
+
+### 3. 运行自动化测试
 
 ```powershell
-python main.py search
+python -m pytest
 ```
-
-搜索读取 `config/keywords.txt`，每个关键词默认取 50 条。yt-dlp 会读取候选元数据以取得标题和 BV 号，但不会下载视频。结果按 BV 号去重并追加到 `data/candidates.csv`；再次搜索会保留已有行的 `selected`。可用 `--limit 30` 调整每个关键词的结果数。新候选中，标题含“第一视角、POV、沉浸式、手部”等线索的行排在前面；CSV 也保存可用的封面链接。`title_hint` 只是预览顺序，不代表已看到手。
-
-打开 CSV 中的 `url`，快速预览并将合格行的 `selected` 从 `0` 改为 `1`。先看封面，再在视频开头、中段和末段各抽看几秒：确认画面接近操作者视角、手部在主要配药段持续可见、手确实操作药品，且抽液、开瓶或配液等动作清楚。即使视频有 10 分钟，只要没有清楚的手部配药动作就不选。PPT、讲课、远景及只有几秒配药动作的视频也不选。编辑 CSV 时请保留表头和 `bvid`、`url` 列。
-
-```powershell
-python main.py download
-```
-
-下载只处理 `selected=1` 的行。默认保存到系统“下载”目录下的专门文件夹（如 Windows 的 `Downloads/B站视频/BV.../`，可通过 `--output-dir` 自定义），每个 BV 独立文件夹，包含 MP4、`info.json` 和封面缩略图。目标目录下的 `downloaded.txt` 是下载档案，再次运行会跳过已完成的视频，失败行可重试，未完成的分片可续传。成功和失败写入目标目录下的 `download.log`。如果某个视频不可访问或未提供缩略图，日志会记录实际结果。
-
-`search` 会在元数据请求之间短暂停顿，遇到 HTTP 412 时最多重试两次；若连续两个关键词都被 412 拒绝，就停止本轮搜索，避免无效请求。每个关键词完成后立即保存已找到的候选；稍后重跑时已有人工选择不会丢失。退出码非零表示本次有搜索失败。搜索阶段不下载视频。CSV 用 UTF-8 BOM 写入，便于 Excel 打开。
-
-如果 B 站对匿名请求持续返回 HTTP 412，可自行选择使用当前登录的浏览器：`python main.py search --cookies-from-browser edge`，下载时也加 `--cookies-from-browser edge`。默认不读取浏览器 Cookie；请只在自己信任的电脑上使用此选项。
-
-若 Windows 拒绝浏览器 Cookie 解密，可使用自己导出的 Netscape 格式 Cookie 文件：`python main.py search --cookies-file C:\path\to\cookies.txt`，下载时同样传入 `--cookies-file`。Cookie 文件包含登录凭据，放在仓库外，不要提交或分享其内容；工具只需要文件路径。
-
-运行 `python -m unittest discover tests` 时出现的 BV 号和“失败”文字来自模拟数据，用来验证单条失败后继续；测试不访问 B 站或下载视频。
