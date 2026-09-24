@@ -147,91 +147,25 @@ platform_labels = {
     "youtube": "YouTube",
 }
 
-primary_target_dir = Path("D:/下载/第一人称配药实操视频")
-primary_target_dir.mkdir(parents=True, exist_ok=True)
+# 唯一规范档案单表：data/临床配药样本来源档案.csv
+target_csv = data_dir / "临床配药样本来源档案.csv"
 
-target_csvs = [
-    data_dir / "临床配药样本来源档案.csv",
-    primary_target_dir / "博主名单与下载对照表.csv",
-    primary_target_dir / "临床配药样本来源档案.csv",
-]
-
-creator_headers = ["序号", "博主名字", "涉及平台", "视频数量", "总大小 (MB)", "临床操作特色与药物类型"]
+creator_headers = ["序号", "博主名字", "涉及平台", "视频数量", "临床操作特色与药物类型"]
 creator_rows = []
 idx = 1
 for author, d in sorted(stats.items(), key=lambda x: x[1]["count"], reverse=True):
     feat = features_map.get(author, "第一人称临床配药规范实操")
     plats = " / ".join(platform_labels.get(p, p) for p in sorted(d["platforms"]))
-    creator_rows.append([idx, author, plats, d["count"], f"{d['size_mb']:.1f}", feat])
+    creator_rows.append([idx, author, plats, d["count"], feat])
     idx += 1
 
-for tcsv in target_csvs:
-    with open(tcsv, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(creator_headers)
-        writer.writerows(creator_rows)
-    print(f"✅ 成功生成对照档案: {tcsv}")
-
-# 全量视频明细对照表
-detail_headers = ["序号", "博主", "平台", "视频标题", "时长", "文件大小", "封面图", "动作抽样帧", "完整目录路径"]
-detail_rows = []
-for i, folder in enumerate(all_folders, 1):
-    info_files = list(folder.glob("*.info.json"))
-    mp4s = list(folder.glob("*.mp4"))
-    if not mp4s:
-        continue
-    size = sum(f.stat().st_size for f in mp4s) / (1024 * 1024)
-    vtitle = ""
-    vauthor = "未知"
-    vplat = "未知"
-    vduration = 0
-    if info_files:
-        try:
-            d = json.loads(info_files[0].read_text(encoding="utf-8"))
-            vtitle = d.get("title", "")
-            vauthor = d.get("uploader") or d.get("author") or ""
-            vplat = d.get("platform", "")
-            vduration = d.get("duration") or d.get("videoDuration") or 0
-        except Exception:
-            pass
-    if not vtitle or not vauthor:
-        parts = folder.name.split(" - ")
-        if len(parts) >= 3:
-            vtitle = parts[1]
-            vauthor = parts[2]
-        elif len(parts) == 2:
-            vtitle = parts[1]
-    if folder.name.startswith("douyin_"):
-        vplat = "douyin"
-    elif folder.name.startswith("xhs_"):
-        vplat = "xiaohongshu"
-    elif folder.name.startswith("BV"):
-        vplat = "bilibili"
-    elif folder.name.startswith("youtube_"):
-        vplat = "youtube"
-
-    has_cover = (folder / "cover.jpg").exists()
-    has_frame = (folder / "frame_sample.jpg").exists()
-
-    detail_rows.append([
-        i,
-        vauthor,
-        platform_labels.get(vplat, vplat),
-        vtitle,
-        f"{int(vduration)}s" if vduration else "--",
-        f"{size:.2f} MB",
-        "是" if has_cover else "否",
-        "是" if has_frame else "否",
-        str(folder.resolve())
-    ])
-
-detail_csv = primary_target_dir / "全量视频下载明细表.csv"
-with open(detail_csv, "w", encoding="utf-8-sig", newline="") as f:
+with open(target_csv, "w", encoding="utf-8-sig", newline="") as f:
     writer = csv.writer(f)
-    writer.writerow(detail_headers)
-    writer.writerows(detail_rows)
-print(f"✅ 成功生成全量视频下载明细表: {detail_csv}")
+    writer.writerow(creator_headers)
+    writer.writerows(creator_rows)
 
-total_vids = len(detail_rows)
+print(f"✅ 成功生成唯一规范样本档案: {target_csv}")
+
+total_vids = sum(d["count"] for d in stats.values())
 total_gb = sum(d["size_mb"] for d in stats.values()) / 1024
 print(f"统计汇总: 博主数量: {len(stats)}, 视频总数: {total_vids}, 占用空间: {total_gb:.2f} GB")

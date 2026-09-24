@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -68,16 +69,25 @@ def extract_first_url(text: str) -> Optional[str]:
     return None
 
 
-def resolve_redirect_url(url: str, headers: Optional[Dict[str, str]] = None) -> str:
-    """Follow HTTP redirects and return the final destination URL."""
+def resolve_redirect_url(url: str, headers: Optional[Dict[str, str]] = None, max_retries: int = 3) -> str:
+    """Follow HTTP redirects and return the final destination URL with retry mechanism."""
     hdrs = headers or {"User-Agent": USER_AGENT_MOBILE}
-    req = urllib.request.Request(url, headers=hdrs)
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return resp.geturl()
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=hdrs)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.geturl()
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.warning(f"resolve_redirect_url failed for {url} after {max_retries} attempts: {e}")
+                return url
+            time.sleep(1.5 * (attempt + 1))
+    return url
 
 
-def download_stream(url: str, dest_path: Path, headers: Optional[Dict[str, str]] = None) -> bool:
-    """Stream download binary file with chunking."""
+def download_stream(url: str, dest_path: Path, headers: Optional[Dict[str, str]] = None, max_retries: int = 5) -> bool:
+    """Stream download binary file with chunking and retries."""
+    import requests
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     part_path = dest_path.with_suffix(dest_path.suffix + ".part")
     hdrs = dict(headers or {})
@@ -88,22 +98,33 @@ def download_stream(url: str, dest_path: Path, headers: Optional[Dict[str, str]]
             hdrs["Referer"] = "https://www.douyin.com/"
         elif "xhscdn.com" in url or "xiaohongshu.com" in url:
             hdrs["Referer"] = "https://www.xiaohongshu.com/"
-    req = urllib.request.Request(url, headers=hdrs)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp, open(part_path, "wb") as f:
-            while True:
-                chunk = resp.read(1024 * 512)
-                if not chunk:
-                    break
-                f.write(chunk)
-        if part_path.exists():
-            part_path.replace(dest_path)
-        return dest_path.exists() and dest_path.stat().st_size > 0
-    except Exception as e:
-        logger.error(f"Download failed for {url}: {e}")
-        if part_path.exists():
-            part_path.unlink()
-        return False
+
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(max_retries=3)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            with session.get(url, headers=hdrs, stream=True, timeout=35) as r:
+                r.raise_for_status()
+                with open(part_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 512):
+                        if chunk:
+                            f.write(chunk)
+            if part_path.exists() and part_path.stat().st_size > 0:
+                part_path.replace(dest_path)
+                return dest_path.exists() and dest_path.stat().st_size > 0
+        except Exception as e:
+            logger.warning(f"Download stream attempt {attempt}/{max_retries} failed for {url[:80]}...: {e}")
+            if part_path.exists():
+                try:
+                    part_path.unlink()
+                except Exception:
+                    pass
+            time.sleep(1.5 * attempt)
+
+    return False
 
 
 def extract_representative_frame(video_path: Path, output_image_path: Path, duration: float = 0) -> bool:
@@ -457,15 +478,22 @@ def explore_and_download_douyin_creator(
         match = re.search(r"/(?:video|share/video)/([0-9]{15,22})", resolved_url)
         if match:
             aweme_id = match.group(1)
-            detail = asyncio.run(_extract_douyin_via_playwright(aweme_id))
-            if detail:
-                sec_uid = detail.get("author", {}).get("sec_uid")
+            try:
+                detail = asyncio.run(_extract_douyin_via_playwright(aweme_id))
+                if detail:
+                    sec_uid = detail.get("author", {}).get("sec_uid")
+            except Exception as e:
+                logger.warning(f"[抖音] 获取作者信息异常: {e}")
 
     if not sec_uid:
         logger.error(f"[抖音] 无法识别创作者 sec_uid: {author_input}")
         return 0
 
-    posts = asyncio.run(_fetch_douyin_author_posts_via_playwright(sec_uid))
+    try:
+        posts = asyncio.run(_fetch_douyin_author_posts_via_playwright(sec_uid))
+    except Exception as e:
+        logger.error(f"[抖音] 获取作者作品列表异常 ({sec_uid}): {e}")
+        return 0
     logger.info(f"[抖音] 从作者主页共探测到 {len(posts)} 部作品")
 
     keywords = ["配药", "配液", "魔法药水", "药", "抽吸", "扎针", "第一视角", "打针", "屁股针", "皮试", "注射", "一镜到底", "输液", "安瓿", "西林瓶"]
