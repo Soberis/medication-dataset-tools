@@ -287,13 +287,14 @@ async def _extract_douyin_via_playwright(aweme_id: str) -> Optional[Dict[str, An
 
         context.on("response", handle_response)
         try:
-            await page.goto(video_url, wait_until="domcontentloaded", timeout=20000)
-            for _ in range(24):
-                if captured_detail:
-                    break
-                await asyncio.sleep(0.5)
+            await page.goto(video_url, wait_until="commit", timeout=25000)
         except Exception as e:
-            logger.warning(f"[抖音] 页面等待超时或网络中断: {e}")
+            logger.warning(f"[抖音] 页面导航提示: {e}")
+
+        for _ in range(30):
+            if captured_detail:
+                break
+            await asyncio.sleep(0.5)
 
         if browser:
             await browser.close()
@@ -442,8 +443,8 @@ async def _fetch_douyin_author_posts_via_playwright(sec_uid: str) -> List[Dict[s
 
         context.on("response", handle_response)
         try:
-            await page.goto(profile_url, wait_until="domcontentloaded", timeout=25000)
-            for _ in range(12):
+            await page.goto(profile_url, wait_until="commit", timeout=25000)
+            for _ in range(16):
                 if captured_posts:
                     break
                 await asyncio.sleep(0.5)
