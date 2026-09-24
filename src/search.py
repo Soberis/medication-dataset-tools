@@ -13,9 +13,22 @@ from .manifest import append_candidates
 
 
 BVID = re.compile(r"BV[0-9A-Za-z]{10}")
-EXCLUDED = ("ppt", "理论", "试题", "考试", "题库", "动画", "游戏", "中药", "兽医", "宠物")
+EXCLUDED = (
+    # Educational/Theory/Exam
+    "ppt", "理论", "试题", "考试", "题库", "动画", "中药", "兽医", "宠物",
+    # Games / Virtual mods
+    "游戏", "我的世界", "甜瓜", "整合包", "mod", "塔科夫", "手游", "像素", "沙盒", "实况", "生存", "花雨庭",
+    # Industrial machinery / factories
+    "洗瓶机", "灯检机", "流水线", "超声波", "工业化", "包装机", "灌装机", "封口机", "药机", "生产线", "压盖钳", "冻干机厂家", "联动线",
+    # DIY / Craft / Irrelevant
+    "戒指", "废铝", "元素收藏", "首饰", "机油", "汽车抽机油", "喷枪", "铜树", "笔芯注射器",
+    # Cosmetic clinic promos
+    "肉毒素", "除皱针", "水光", "保妥适",
+    # Irrelevant topics
+    "这该怎么读", "女巫", "双相", "抑郁症", "农药", "宝宝吃药", "拿注射器喂"
+)
 ACTION_TERMS = ("配药", "抽药", "抽吸", "配液", "静配", "安瓿", "西林瓶", "药液", "药瓶")
-VIEW_TERMS = ("第一视角", "pov", "沉浸式", "身临其境", "手部", "手持", "头戴")
+VIEW_TERMS = ("第一视角", "pov", "沉浸式", "身临其境", "手部", "手持", "头戴", "护士 vlog")
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
 
