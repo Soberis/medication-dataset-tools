@@ -4,4 +4,14 @@ metadata/
 __pycache__/
 .venv/
 urls.csv
-data/
+
+# Data directory ignore rules
+data/browser_profile*
+data/*.webm
+data/*.mp4
+data/*.png
+data/*.jpg
+data/*.json
+data/youtube_cookies.txt
+data/candidates.csv
+data/social_links.txt
