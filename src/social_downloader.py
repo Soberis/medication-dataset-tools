@@ -339,11 +339,13 @@ def download_douyin(share_text: str, output_root: Path = DEFAULT_OUTPUT_DIR) -> 
     cover_generic = target_dir / "cover.jpg"
     frame_path = target_dir / "frame_sample.jpg"
 
+    sec_uid = detail.get("author", {}).get("sec_uid", "")
     metadata = {
         "platform": "douyin",
         "id": aweme_id,
         "title": desc,
         "uploader": author,
+        "sec_uid": sec_uid,
         "duration": duration,
         "url": resolved_url,
         "original_share": raw_url,
