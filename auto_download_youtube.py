@@ -30,7 +30,8 @@ except Exception:
 import yt_dlp
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_OUTPUT_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_OUTPUT_DIR = Path("D:/下载/第一人称配药实操视频")
+OLD_OUTPUT_DIRS = [Path("D:/下载"), Path.home() / "Downloads" / "第一人称配药实操视频"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,18 +142,24 @@ def is_qualified_candidate(title: str, duration: Optional[float] = None) -> bool
         if term in title_lower:
             return False
 
-    # 2. Duration check: preference for Shorts / short POV clips (<= 600 seconds)
-    if duration is not None and duration > 600:
+    # 2. Duration check: True clinical two-handed dispensing requires at least 28s (usually 40s - 3min)
+    if duration is not None and (duration < 28.0 or duration > 600.0):
         return False
 
-    # 3. Whitelist check
+    # 3. Reject pure ampoule flicking sound memes without real dispensing
+    if any(k in title_lower for k in ["彈安瓿", "弹安瓿", "掰安瓿"]) and not any(k in title_lower for k in ["配药", "配藥", "連配", "连配", "一镜到底", "一鏡到底"]):
+        return False
+
+    # 4. Reject pure single-action injection/needle shots without dispensing
+    if any(k in title_lower for k in ["肌肉注射", "留置針", "留置针", "留著針", "留着针", "皮下注射"]) and not any(k in title_lower for k in ["配药", "配藥", "連配", "连配", "輸液", "输液"]):
+        return False
+
+    # 5. Core dispensing operation check
     matched_terms = [t for t in WHITELIST_TERMS if t in title_lower]
     if len(matched_terms) >= 1:
-        # Extra check: Must contain either 配药/配藥 or 安瓿/抽吸 or 第一视角/一镜到底 or 针/输液
         core_hits = any(t in title_lower for t in [
-            "配药", "配藥", "安瓿", "抽吸", "一镜到底", "一鏡到底", "第一视角", "第一視角",
-            "扎针", "扎針", "飞针", "飛針", "加药", "加藥", "输液", "輸液", "抽药", "抽藥", "打针", "打針",
-            "注射", "留置针", "留置針", "抽血", "皮试", "皮試", "连配", "連配"
+            "配药", "配藥", "抽吸", "一镜到底", "一鏡到底", "第一视角", "第一視角",
+            "加药", "加藥", "输液", "輸液", "抽药", "抽藥", "连配", "連配", "流水線", "流水线"
         ])
         return core_hits
 
@@ -232,6 +239,12 @@ def download_single_youtube(candidate: Dict[str, Any], output_dir: Path) -> bool
         logger.info(f"[SKIP] 视频已存在，跳过：{video_path.name}")
         extract_representative_frame(video_path, frame_path, candidate.get("duration", 0))
         return True
+    for old_dir in OLD_OUTPUT_DIRS:
+        if old_dir.exists() and old_dir != output_dir:
+            for old_f in old_dir.glob(f"*{vid}*"):
+                if old_f.is_dir() and list(old_f.glob("*.mp4")):
+                    logger.info(f"[SKIP] 历史数据集中已存在该视频，跳过：{old_f.name}")
+                    return True
 
     proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy") or "http://127.0.0.1:7890"
     node_path = shutil.which("node") or r"C:\nvm4w\nodejs\node.exe"

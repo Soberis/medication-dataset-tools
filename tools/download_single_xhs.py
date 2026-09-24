@@ -17,7 +17,7 @@ USER_AGENT_MOBILE = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
 )
 
-DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DOWNLOAD_DIR = Path("D:/下载/第一人称配药实操视频")
 PROFILE_DIR = Path("./data/browser_profile_xhs").resolve()
 
 
@@ -202,6 +202,15 @@ async def download_note(raw_input: str):
             )
             print(f"🖼 动作抽样帧提取完成: {frame_file.name}", flush=True)
             print(f"📁 归档目录: {target_dir}", flush=True)
+
+            # Auto-sync creator and detail tables
+            try:
+                gen_script = Path(__file__).resolve().parent / "generate_creator_table.py"
+                if gen_script.exists():
+                    subprocess.run([sys.executable, str(gen_script)], check=False)
+            except Exception:
+                pass
+
             return True
         finally:
             await page.close()
@@ -211,3 +220,4 @@ async def download_note(raw_input: str):
 if __name__ == "__main__":
     url_arg = sys.argv[1] if len(sys.argv) > 1 else "https://xhslink.cn/o/1PzelvwO8vO"
     asyncio.run(download_note(url_arg))
+

@@ -32,7 +32,7 @@ RAW_LINKS = [
     "https://xhslink.cn/o/K5AFw1KQBp",
 ]
 
-DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DOWNLOAD_DIR = Path("D:/下载/第一人称配药实操视频")
 
 
 def resolve_short_url(short_url: str) -> str:

@@ -21,7 +21,8 @@ from playwright.async_api import async_playwright
 
 sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 
-DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DOWNLOAD_DIR = Path("D:/下载/第一人称配药实操视频")
+OLD_OUTPUT_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
 PROFILE_DIR = Path("./data/browser_profile_xhs").resolve()
 
 # Relevant clinical medication keywords
@@ -233,6 +234,16 @@ async def harvest_creator(page, creator: Dict[str, str], max_videos: int = 15):
                 if video_file.exists() and video_file.stat().st_size > 1024 * 500:
                     print(f"  [{idx}] 📦 本地已有，跳过: {clean_title} ({duration}s)", flush=True)
                     continue
+
+                if OLD_OUTPUT_DIR.exists():
+                    found_in_old = False
+                    for old_f in OLD_OUTPUT_DIR.glob(f"*{note_id}*"):
+                        if old_f.is_dir() and list(old_f.glob("*.mp4")):
+                            print(f"  [{idx}] 📦 历史数据集中已有，跳过: {clean_title} ({duration}s)", flush=True)
+                            found_in_old = True
+                            break
+                    if found_in_old:
+                        continue
 
                 print(f"  [{idx}] 🎬 发现符合实操视频: 《{clean_title}》 (时长: {duration}s)", flush=True)
                 stream_url = note_detail["bestStream"]["url"]

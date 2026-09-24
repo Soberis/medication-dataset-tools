@@ -7,7 +7,11 @@ from pathlib import Path
 # Force UTF-8 stdout
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = Path.home() / "Downloads" / "第一人称配药实操视频"
+ROOTS = [
+    Path("D:/下载/第一人称配药实操视频"),
+    Path("D:/下载"),
+    Path.home() / "Downloads" / "第一人称配药实操视频",
+]
 
 features_map = {
     "一朵小花o（涨粉版）": "血透室临床配药、费森尤斯透析管路安装预冲、密闭式血液透析排气、静脉推注",
@@ -48,19 +52,32 @@ features_map = {
     "木子李": "治疗台标准化加药配液、无菌盘器械规整与药液配制",
     "一只社区喵喵": "社区医疗机构第一视角配药、小剂量药液抽吸与溶解",
     "叁叁": "病区护士实录配药、输液袋连续加药与输液器连接",
-    "O呦": "超长版病房摆药与配药全流程实录、药物核对与注射剂分类准备",
+    "禾禾不加班": "小诊所第一视角规范配药、皮试药液配制与稀释、注射器抽取西林瓶粉针",
+    "小芠": "临床护士沉浸式配药、玻璃安瓿瓶折断与药液精确抽吸",
+    "蔡不然": "临床静脉留置针穿刺、肌内注射（屁股针）药液配制、皮试操作与观察",
+    "🤧阿Q": "医院夜班第一人称配药、一镜到底连续配液、多剂量药液抽吸与排气",
+    "小刘护士": "临床注射配药、多联抗生素注射液抽吸、注射器垂直排气",
 }
 
 stats = defaultdict(lambda: {"count": 0, "size_mb": 0.0, "platforms": set(), "titles": []})
 
-for folder in ROOT.iterdir():
-    if not folder.is_dir() or folder.name.startswith("."):
-        continue
+all_folders = []
+seen_names = set()
+for r in ROOTS:
+    if r.exists():
+        for f in sorted(r.iterdir()):
+            if f.is_dir() and not f.name.startswith(".") and f.name not in seen_names:
+                all_folders.append(f)
+                seen_names.add(f.name)
+
+for folder in all_folders:
     author = "未知"
     title = ""
+    duration = 0
     mp4s = list(folder.glob("*.mp4"))
     if not mp4s:
         continue
+    video_file = mp4s[0]
     size = sum(f.stat().st_size for f in mp4s) / (1024 * 1024)
 
     # 优先根据文件夹前缀精准判定平台
@@ -80,6 +97,7 @@ for folder in ROOT.iterdir():
         try:
             data = json.loads(info_files[0].read_text(encoding="utf-8"))
             title = data.get("title", "")
+            duration = data.get("duration") or data.get("videoDuration") or 0
             if not platform or platform == "未知":
                 platform = data.get("platform") or ("bilibili" if "bvid" in data else "douyin")
             if "uploader" in data:
@@ -105,20 +123,22 @@ for folder in ROOT.iterdir():
             else:
                 author = "临床配药精选"
 
+    if not title:
+        parts = folder.name.split(" - ")
+        if len(parts) >= 2:
+            title = parts[1].strip()
+        else:
+            title = folder.name
+
     stats[author]["count"] += 1
     stats[author]["size_mb"] += size
     stats[author]["platforms"].add(str(platform))
     if title:
         stats[author]["titles"].append(title)
 
-# Write to CSV with utf-8-sig (Excel friendly)
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 data_dir = PROJECT_DIR / "data"
 data_dir.mkdir(parents=True, exist_ok=True)
-
-target_csvs = [
-    data_dir / "临床配药样本来源档案.csv",
-]
 
 platform_labels = {
     "douyin": "抖音 (Douyin)",
@@ -127,19 +147,25 @@ platform_labels = {
     "youtube": "YouTube",
 }
 
-for out_path in target_csvs:
-    with open(out_path, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["序号", "博主名字", "涉及平台", "视频数量", "临床操作特色与药物类型"])
+# 严格只保留单一档案表：data/临床配药样本来源档案.csv
+target_csv = data_dir / "临床配药样本来源档案.csv"
 
-        idx = 1
-        for author, d in sorted(stats.items(), key=lambda x: x[1]["count"], reverse=True):
-            feat = features_map.get(author, "第一人称临床配药规范实操")
-            plats = " / ".join(platform_labels.get(p, p) for p in sorted(d["platforms"]))
-            writer.writerow([idx, author, plats, d["count"], feat])
-            idx += 1
-    print(f"Successfully generated CSV: {out_path}")
+creator_headers = ["序号", "博主名字", "涉及平台", "视频数量", "临床操作特色与药物类型"]
+creator_rows = []
+idx = 1
+for author, d in sorted(stats.items(), key=lambda x: x[1]["count"], reverse=True):
+    feat = features_map.get(author, "第一人称临床配药规范实操")
+    plats = " / ".join(platform_labels.get(p, p) for p in sorted(d["platforms"]))
+    creator_rows.append([idx, author, plats, d["count"], feat])
+    idx += 1
+
+with open(target_csv, "w", encoding="utf-8-sig", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(creator_headers)
+    writer.writerows(creator_rows)
+
+print(f"✅ 成功生成唯一规范样本档案: {target_csv}")
 
 total_vids = sum(d["count"] for d in stats.values())
 total_gb = sum(d["size_mb"] for d in stats.values()) / 1024
-print(f"Total Creators: {len(stats)}, Total Videos: {total_vids}, Total Size: {total_gb:.2f} GB")
+print(f"统计汇总: 博主数量: {len(stats)}, 视频总数: {total_vids}, 占用空间: {total_gb:.2f} GB")

@@ -31,7 +31,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yt_dlp
 
-DEFAULT_OUTPUT_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_OUTPUT_DIR = Path("D:/下载/第一人称配药实操视频")
+OLD_OUTPUT_DIRS = [Path("D:/下载"), Path.home() / "Downloads" / "第一人称配药实操视频"]
 USER_AGENT_MOBILE = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
@@ -343,6 +344,12 @@ def download_douyin(share_text: str, output_root: Path = DEFAULT_OUTPUT_DIR) -> 
         logger.info(f"[抖音] 本地已存在完整视频，跳过下载：{video_path}")
         extract_representative_frame(video_path, frame_path, duration)
         return True
+    for old_dir in OLD_OUTPUT_DIRS:
+        if old_dir.exists() and old_dir != output_root:
+            for old_f in old_dir.glob(f"*{aweme_id}*"):
+                if old_f.is_dir() and list(old_f.glob("*.mp4")):
+                    logger.info(f"[抖音] 历史数据集中已存在该视频，跳过下载：{old_f.name}")
+                    return True
 
     bitrates = video_data.get("bit_rate") or []
     stream_url = None
@@ -463,6 +470,9 @@ def explore_and_download_douyin_creator(
 
     keywords = ["配药", "配液", "魔法药水", "药", "抽吸", "扎针", "第一视角", "打针", "屁股针", "皮试", "注射", "一镜到底", "输液", "安瓿", "西林瓶"]
     existing_folders = [f.name for f in output_root.iterdir() if f.is_dir()] if output_root.exists() else []
+    for old_dir in OLD_OUTPUT_DIRS:
+        if old_dir.exists() and old_dir != output_root:
+            existing_folders.extend([f.name for f in old_dir.iterdir() if f.is_dir()])
 
     downloaded = 0
     for p in posts[:max_posts]:

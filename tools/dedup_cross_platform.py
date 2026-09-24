@@ -43,7 +43,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("dedup_cross_platform")
 
-DEFAULT_DATASET_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DATASET_DIR = Path("D:/下载/第一人称配药实操视频")
 
 
 def sanitize_text(text: str) -> str:
@@ -303,8 +303,22 @@ def main():
         logger.error(f"数据集目录不存在：{dataset_dir}")
         sys.exit(1)
 
-    folders = [f for f in dataset_dir.iterdir() if f.is_dir() and not f.name.startswith(".")]
-    logger.info(f"正在载入数据集目录：{dataset_dir} (共 {len(folders)} 个视频条目)")
+    scan_dirs = [dataset_dir]
+    if dataset_dir == DEFAULT_DATASET_DIR:
+        old_dir = Path.home() / "Downloads" / "第一人称配药实操视频"
+        if old_dir.exists() and old_dir not in scan_dirs:
+            scan_dirs.append(old_dir)
+
+    folders = []
+    seen_folder_names = set()
+    for s_dir in scan_dirs:
+        if s_dir.exists():
+            for f in s_dir.iterdir():
+                if f.is_dir() and not f.name.startswith(".") and f.name not in seen_folder_names:
+                    folders.append(f)
+                    seen_folder_names.add(f.name)
+
+    logger.info(f"正在载入数据集目录：{[str(d) for d in scan_dirs]} (共 {len(folders)} 个视频条目)")
 
     records = [VideoRecord(f) for f in folders if (f / f"{f.name.split(' - ')[0].replace('douyin_', '').replace('xhs_', '')}.mp4").exists() or list(f.glob("*.mp4"))]
     logger.info(f"有效视频文件数: {len(records)}")

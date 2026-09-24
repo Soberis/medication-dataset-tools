@@ -10,7 +10,7 @@ from src.search import search
 ROOT = Path(__file__).resolve().parent
 
 
-DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DOWNLOAD_DIR = Path("D:/下载/第一人称配药实操视频")
 
 
 def main() -> int:

@@ -33,7 +33,8 @@ RAW_LINKS = [
     "https://xhslink.cn/o/K5AFw1KQBp",
 ]
 
-DEFAULT_DOWNLOAD_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
+DEFAULT_DOWNLOAD_DIR = Path("D:/下载/第一人称配药实操视频")
+OLD_OUTPUT_DIR = Path.home() / "Downloads" / "第一人称配药实操视频"
 
 
 def resolve_short_url(short_url: str) -> str:
@@ -239,9 +240,17 @@ async def run_batch():
                 if data.get("coverUrl") and not cover_file.exists():
                     download_stream(data["coverUrl"], cover_file)
 
+                already_exists = False
                 if video_file.exists() and video_file.stat().st_size > 1024 * 500:
-                    mb = video_file.stat().st_size / (1024 * 1024)
-                    print(f"  📦 视频文件已存在，无需重复拉取 ({mb:.2f} MB)", flush=True)
+                    already_exists = True
+                elif OLD_OUTPUT_DIR.exists():
+                    for old_f in OLD_OUTPUT_DIR.glob(f"*{item['note_id']}*"):
+                        if old_f.is_dir() and list(old_f.glob("*.mp4")):
+                            already_exists = True
+                            break
+
+                if already_exists:
+                    print(f"  📦 视频文件已存在（本地或历史目录），无需重复拉取", flush=True)
                 else:
                     print(f"  ⬇️ 正在下载高清原画视频流 ({best_stream.get('quality')}, ~{best_stream.get('size', 0)/1024/1024:.1f} MB)...", flush=True)
                     ok = download_stream(stream_url, video_file)
