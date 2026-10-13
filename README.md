@@ -4,6 +4,19 @@
 
 ---
 
+## 🔗 关联项目生态 (Embodied AI Ecosystem)
+
+本项目是**面向具身智能配药操作学习与视觉质检体系**的公开/网络示范数据挖掘与科学评估引擎，与实景采集端、云端数据平台和 GPU 动作推理节点紧密联动：
+
+| 角色 | 仓库 | 核心技术栈 | 职责定位 |
+| :--- | :--- | :--- | :--- |
+| **公开示范挖掘源** | **medication-dataset-tools**（本项目） | Python / Playwright / OpenCV | 第一人称及双手实操网络视频跨平台检索、批量采集、时序多锚点量化质检与去重 |
+| **现场实采端** | [medication-camera](https://github.com/Soberis/medication-camera/tree/dev) | RK3588 / Orbbec SDK / C++ | 医院药房多机位音视频同步录制、硬件/HTTP 触发、本地 Spool 缓冲池与批量直传 |
+| **中心数据平台** | [medication-video-platform](https://github.com/Soberis/medication-video-platform/tree/dev) | Java 21 / React / Docker | 数据接收归组、媒体质检、MediaPipe 手部骨骼检测、任务调度、人机复核与 HDF5 导出 |
+| **动作推理节点** | [medication-action-worker](https://github.com/Soberis/medication-action-worker/tree/dev) | RTX 4090 / PyTorch / Qwen | 监听 RabbitMQ 任务，执行 Qwen3.5-4B 有界切片动作时序推理与受体实体绑定 |
+
+---
+
 ## 🌟 核心特性与设计哲学
 
 1. **“大道至简”的数据档案管理**：
@@ -128,3 +141,11 @@ python tools/generate_creator_table.py
 ```powershell
 python -m pytest
 ```
+
+#### F. 下游平台无缝对接 (导入至 medication-video-platform)
+本工具集采集归档的标准目录（如 `bilibili_BV...`、`douyin_...`、`xhs_...`、`youtube_...`）可直接无缝输送至中心数据平台：
+```powershell
+# 在 medication-video-platform 根目录下执行批量导入与前置手部准入门禁
+node tools/import-web-video-batch.mjs --dir "D:\Dev\Projects\medication-dataset-tools\data\videos"
+```
+平台将自动通过轻量级 MediaPipe 执行前置手部准入快速抽检，合格后自动入库并触发多视角手部 21 关节点三维骨骼提取与 Qwen3.5 动作时序候选推理，最终导出为具身智能标准的 `human-demonstration-hdf5.v2` 规整数据集。
