@@ -11,7 +11,7 @@
 | 角色 | 仓库 | 核心技术栈 | 职责定位 |
 | :--- | :--- | :--- | :--- |
 | **公开示范挖掘源** | **medication-dataset-tools**（本项目） | Python / Playwright / OpenCV | 第一人称及双手实操网络视频跨平台检索、批量采集、时序多锚点量化质检与去重 |
-| **现场实采端** | [medication-camera](https://github.com/Soberis/medication-camera/tree/dev) | RK3588 / Orbbec SDK / C++ | 医院药房多机位音视频同步录制、硬件/HTTP 触发、本地 Spool 缓冲池与批量直传 |
+| **现场实采端** | [medication-camera-edge](https://github.com/Soberis/medication-camera-edge/tree/dev) | RK3588 / Orbbec SDK / C++ | 医院药房多机位音视频同步录制、硬件/HTTP 触发、本地 Spool 缓冲池与批量直传 |
 | **中心数据平台** | [medication-video-platform](https://github.com/Soberis/medication-video-platform/tree/dev) | Java 21 / React / Docker | 数据接收归组、媒体质检、MediaPipe 手部骨骼检测、任务调度、人机复核与 HDF5 导出 |
 | **动作推理节点** | [medication-action-worker](https://github.com/Soberis/medication-action-worker/tree/dev) | RTX 4090 / PyTorch / Qwen | 监听 RabbitMQ 任务，执行 Qwen3.5-4B 有界切片动作时序推理与受体实体绑定 |
 
